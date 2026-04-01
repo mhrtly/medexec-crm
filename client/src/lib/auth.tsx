@@ -18,39 +18,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Timeout: if getSession hangs (e.g. navigator.locks blocked in sandbox), fall through
-    const timeout = setTimeout(() => setLoading(false), 3000);
-
+    // Restore session from localStorage on load
     supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(timeout);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     }).catch(() => {
-      clearTimeout(timeout);
       setLoading(false);
     });
 
+    // Listen for auth changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      clearTimeout(timeout);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
     return () => {
-      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error ? new Error(error.message) : null };
-  };
-
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
     return { error: error ? new Error(error.message) : null };
   };
 
