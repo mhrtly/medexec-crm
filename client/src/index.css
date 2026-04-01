@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MedExecWomen CRM — Deep navy + warm coral accent
+   Conveys: authority, warmth, executive polish */
+
+:root {
+  --button-outline: rgba(0,0,0, .10);
+  --badge-outline: rgba(0,0,0, .05);
+  --opaque-button-border-intensity: -8;
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .08);
+
+  --background: 220 20% 97%;
+  --foreground: 222 30% 12%;
+  --border: 220 12% 88%;
+  --card: 220 20% 99%;
+  --card-foreground: 222 30% 12%;
+  --card-border: 220 12% 92%;
+
+  --sidebar: 222 35% 14%;
+  --sidebar-foreground: 220 15% 92%;
+  --sidebar-border: 222 25% 20%;
+  --sidebar-primary: 4 72% 62%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 25% 20%;
+  --sidebar-accent-foreground: 220 15% 92%;
+  --sidebar-ring: 4 72% 62%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 30% 12%;
+  --popover-border: 220 12% 88%;
+
+  --primary: 4 72% 62%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 14% 92%;
+  --secondary-foreground: 222 30% 20%;
+  --muted: 220 14% 93%;
+  --muted-foreground: 220 10% 46%;
+  --accent: 220 14% 92%;
+  --accent-foreground: 222 30% 12%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --input: 220 12% 78%;
+  --ring: 4 72% 62%;
+
+  --chart-1: 4 72% 55%;
+  --chart-2: 222 35% 40%;
+  --chart-3: 170 50% 42%;
+  --chart-4: 43 74% 49%;
+  --chart-5: 262 50% 55%;
+
+  --font-sans: 'General Sans', 'Inter', sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius: .5rem;
+
+  --shadow-2xs: 0px 1px 2px 0px hsl(222 30% 12% / 0.03);
+  --shadow-xs: 0px 1px 3px 0px hsl(222 30% 12% / 0.04);
+  --shadow-sm: 0px 1px 2px 0px hsl(222 30% 12% / 0.05), 0px 1px 3px -1px hsl(222 30% 12% / 0.04);
+  --shadow: 0px 2px 4px 0px hsl(222 30% 12% / 0.05), 0px 1px 2px -1px hsl(222 30% 12% / 0.04);
+  --shadow-md: 0px 4px 8px 0px hsl(222 30% 12% / 0.06), 0px 2px 4px -1px hsl(222 30% 12% / 0.04);
+  --shadow-lg: 0px 8px 16px 0px hsl(222 30% 12% / 0.07), 0px 4px 6px -1px hsl(222 30% 12% / 0.04);
+  --shadow-xl: 0px 16px 32px 0px hsl(222 30% 12% / 0.08), 0px 8px 10px -1px hsl(222 30% 12% / 0.04);
+  --shadow-2xl: 0px 24px 48px 0px hsl(222 30% 12% / 0.12);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+.dark {
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .09);
+
+  --background: 222 25% 8%;
+  --foreground: 220 15% 92%;
+  --border: 222 18% 18%;
+  --card: 222 22% 11%;
+  --card-foreground: 220 15% 92%;
+  --card-border: 222 18% 15%;
+
+  --sidebar: 222 30% 10%;
+  --sidebar-foreground: 220 15% 88%;
+  --sidebar-border: 222 22% 16%;
+  --sidebar-primary: 4 72% 65%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 22% 16%;
+  --sidebar-accent-foreground: 220 15% 88%;
+  --sidebar-ring: 4 72% 65%;
+
+  --popover: 222 22% 12%;
+  --popover-foreground: 220 15% 92%;
+  --popover-border: 222 18% 18%;
+
+  --primary: 4 72% 65%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 222 18% 18%;
+  --secondary-foreground: 220 15% 88%;
+  --muted: 222 15% 20%;
+  --muted-foreground: 220 10% 55%;
+  --accent: 222 15% 18%;
+  --accent-foreground: 220 15% 92%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --input: 222 15% 28%;
+  --ring: 4 72% 65%;
+
+  --chart-1: 4 72% 65%;
+  --chart-2: 222 50% 65%;
+  --chart-3: 170 50% 55%;
+  --chart-4: 43 74% 65%;
+  --chart-5: 262 50% 65%;
+
+  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.15);
+  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.20);
+  --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.22), 0px 1px 3px -1px hsl(0 0% 0% / 0.18);
+  --shadow: 0px 2px 4px 0px hsl(0 0% 0% / 0.22), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow-md: 0px 4px 8px 0px hsl(0 0% 0% / 0.25), 0px 2px 4px -1px hsl(0 0% 0% / 0.18);
+  --shadow-lg: 0px 8px 16px 0px hsl(0 0% 0% / 0.28), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
+  --shadow-xl: 0px 16px 32px 0px hsl(0 0% 0% / 0.30), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
+  --shadow-2xl: 0px 24px 48px 0px hsl(0 0% 0% / 0.40);
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Tabular numbers for data columns */
+.tabular-nums {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 2px;
+}
+
+input[type="search"]::-webkit-search-cancel-button {
+  @apply hidden;
+}
+
+/* Elevation utilities */
+@layer utilities {
+  .hover-elevate:not(.no-default-hover-elevate) {
+    position: relative;
+    z-index: 0;
+  }
+  .hover-elevate:not(.no-default-hover-elevate)::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0px;
+    border-radius: inherit;
+    z-index: 999;
+  }
+  .hover-elevate:hover:not(.no-default-hover-elevate)::after {
+    background-color: var(--elevate-1);
+  }
+}
