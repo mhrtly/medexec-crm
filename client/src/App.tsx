@@ -5,6 +5,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { TargetAudienceProvider } from "@/lib/target-audience";
 import Layout from "@/components/layout";
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
@@ -13,6 +14,7 @@ import ContactDetailPage from "@/pages/contact-detail";
 import OrganizationsPage from "@/pages/organizations";
 import OrgDetailPage from "@/pages/org-detail";
 import TagsPage from "@/pages/tags";
+import MergePage from "@/pages/merge";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedApp() {
@@ -34,17 +36,20 @@ function AuthenticatedApp() {
   }
 
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={DashboardPage} />
-        <Route path="/contacts" component={ContactsPage} />
-        <Route path="/contacts/:id" component={ContactDetailPage} />
-        <Route path="/organizations" component={OrganizationsPage} />
-        <Route path="/organizations/:id" component={OrgDetailPage} />
-        <Route path="/tags" component={TagsPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <TargetAudienceProvider>
+      <Layout>
+        <Switch>
+          <Route path="/" component={DashboardPage} />
+          <Route path="/contacts" component={ContactsPage} />
+          <Route path="/contacts/:id" component={ContactDetailPage} />
+          <Route path="/organizations" component={OrganizationsPage} />
+          <Route path="/organizations/:id" component={OrgDetailPage} />
+          <Route path="/tags" component={TagsPage} />
+          <Route path="/merge" component={MergePage} />
+          <Route component={NotFound} />
+        </Switch>
+      </Layout>
+    </TargetAudienceProvider>
   );
 }
 

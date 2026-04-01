@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useTargetAudience, VP_PLUS_SENIORITIES } from '@/lib/target-audience';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +18,7 @@ interface Contact {
   relationship_status: string | null;
   gender: string | null;
   is_verified: boolean;
-  organizations: { name: string } | null;
+  organizations: { name: string; is_medtech: boolean | null } | null;
 }
 
 const warmthColor: Record<string, string> = {
@@ -38,6 +39,7 @@ const statusColor: Record<string, string> = {
 const PAGE_SIZE = 50;
 
 export default function ContactsPage() {
+  const { filterActive } = useTargetAudience();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(0);
@@ -59,10 +61,24 @@ export default function ContactsPage() {
 
   const loadContacts = useCallback(async () => {
     setLoading(true);
+
+    // When target audience filter is active, use !inner join to get only medtech org contacts
+    const selectStr = filterActive
+      ? 'id, full_name, title, seniority, email, warmth, relationship_status, gender, is_verified, organizations!inner(name, is_medtech)'
+      : 'id, full_name, title, seniority, email, warmth, relationship_status, gender, is_verified, organizations(name, is_medtech)';
+
     let query = supabase
       .from('contacts')
-      .select('id, full_name, title, seniority, email, warmth, relationship_status, gender, is_verified, organizations(name)', { count: 'exact' });
+      .select(selectStr, { count: 'exact' });
 
+    // Apply target audience filters when active
+    if (filterActive) {
+      query = query.eq('gender', 'Female');
+      query = query.in('seniority', VP_PLUS_SENIORITIES);
+      query = query.eq('organizations.is_medtech', true);
+    }
+
+    // Apply additional manual filters
     if (debouncedSearch) {
       query = query.or(`full_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,title.ilike.%${debouncedSearch}%`);
     }
@@ -77,7 +93,7 @@ export default function ContactsPage() {
     setContacts((data ?? []) as unknown as Contact[]);
     setCount(total ?? 0);
     setLoading(false);
-  }, [debouncedSearch, page, sortBy, sortAsc, filterGender, filterWarmth, filterSeniority]);
+  }, [debouncedSearch, page, sortBy, sortAsc, filterGender, filterWarmth, filterSeniority, filterActive]);
 
   useEffect(() => {
     loadContacts();
@@ -86,7 +102,7 @@ export default function ContactsPage() {
   // Reset page on filter/search change
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, filterGender, filterWarmth, filterSeniority]);
+  }, [debouncedSearch, filterGender, filterWarmth, filterSeniority, filterActive]);
 
   const totalPages = Math.ceil(count / PAGE_SIZE);
   const hasActiveFilters = filterGender !== 'all' || filterWarmth !== 'all' || filterSeniority !== 'all';
@@ -113,7 +129,12 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Contacts</h1>
-          <p className="text-sm text-muted-foreground mt-0.5 tabular-nums">{count.toLocaleString()} contacts</p>
+          <p className="text-sm text-muted-foreground mt-0.5 tabular-nums">
+            {count.toLocaleString()} contacts
+            {filterActive && (
+              <span className="ml-1 text-primary font-medium">(target audience)</span>
+            )}
+          </p>
         </div>
       </div>
 
@@ -149,16 +170,18 @@ export default function ContactsPage() {
       {/* Filter row */}
       {showFilters && (
         <div className="flex items-center gap-3 flex-wrap">
-          <Select value={filterGender} onValueChange={setFilterGender}>
-            <SelectTrigger className="w-36 h-8 text-xs" data-testid="select-gender">
-              <SelectValue placeholder="Gender" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All genders</SelectItem>
-              <SelectItem value="Female">Female</SelectItem>
-              <SelectItem value="Male">Male</SelectItem>
-            </SelectContent>
-          </Select>
+          {!filterActive && (
+            <Select value={filterGender} onValueChange={setFilterGender}>
+              <SelectTrigger className="w-36 h-8 text-xs" data-testid="select-gender">
+                <SelectValue placeholder="Gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All genders</SelectItem>
+                <SelectItem value="Female">Female</SelectItem>
+                <SelectItem value="Male">Male</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           <Select value={filterWarmth} onValueChange={setFilterWarmth}>
             <SelectTrigger className="w-32 h-8 text-xs" data-testid="select-warmth">
               <SelectValue placeholder="Warmth" />
@@ -170,18 +193,21 @@ export default function ContactsPage() {
               <SelectItem value="cold">Cold</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={filterSeniority} onValueChange={setFilterSeniority}>
-            <SelectTrigger className="w-36 h-8 text-xs" data-testid="select-seniority">
-              <SelectValue placeholder="Seniority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All seniority</SelectItem>
-              <SelectItem value="C-Suite">C-Suite</SelectItem>
-              <SelectItem value="VP">VP</SelectItem>
-              <SelectItem value="Director">Director</SelectItem>
-              <SelectItem value="Manager">Manager</SelectItem>
-            </SelectContent>
-          </Select>
+          {!filterActive && (
+            <Select value={filterSeniority} onValueChange={setFilterSeniority}>
+              <SelectTrigger className="w-36 h-8 text-xs" data-testid="select-seniority">
+                <SelectValue placeholder="Seniority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All seniority</SelectItem>
+                <SelectItem value="C-Suite">C-Suite</SelectItem>
+                <SelectItem value="VP">VP</SelectItem>
+                <SelectItem value="SVP/EVP">SVP/EVP</SelectItem>
+                <SelectItem value="Board">Board</SelectItem>
+                <SelectItem value="President/GM">President/GM</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           {hasActiveFilters && (
             <Button
               variant="ghost"

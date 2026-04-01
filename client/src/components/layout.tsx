@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
+import { useTargetAudience } from '@/lib/target-audience';
 import {
   LayoutDashboard,
   Users,
@@ -10,6 +11,9 @@ import {
   Sun,
   ChevronLeft,
   ChevronRight,
+  GitMerge,
+  Target,
+  Eye,
 } from 'lucide-react';
 import { useState, useEffect, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
@@ -20,11 +24,13 @@ const navItems = [
   { path: '/contacts', label: 'Contacts', icon: Users },
   { path: '/organizations', label: 'Organizations', icon: Building2 },
   { path: '/tags', label: 'Tags', icon: Tag },
+  { path: '/merge', label: 'Merge', icon: GitMerge },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, signOut } = useAuth();
+  const { filterActive, setFilterActive } = useTargetAudience();
   const [collapsed, setCollapsed] = useState(false);
   const [dark, setDark] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -52,6 +58,39 @@ export default function Layout({ children }: { children: ReactNode }) {
           {!collapsed && (
             <span className="font-semibold text-sm tracking-tight whitespace-nowrap">MedExecWomen</span>
           )}
+        </div>
+
+        {/* Target Audience Toggle */}
+        <div className={`px-2 py-2 border-b border-sidebar-border ${collapsed ? 'flex justify-center' : ''}`}>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setFilterActive(!filterActive)}
+                className={`flex items-center gap-2 w-full px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                  filterActive
+                    ? 'bg-primary/15 text-primary border border-primary/25'
+                    : 'bg-sidebar-accent/50 text-sidebar-foreground/60 border border-transparent'
+                } ${collapsed ? 'justify-center px-2' : ''}`}
+                data-testid="button-audience-toggle"
+              >
+                {filterActive ? (
+                  <Target className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <Eye className="w-3.5 h-3.5 shrink-0" />
+                )}
+                {!collapsed && (
+                  <span className="truncate">
+                    {filterActive ? 'Target Audience' : 'Showing All'}
+                  </span>
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-[200px]">
+              {filterActive
+                ? 'Showing women VP+ at medtech orgs. Click to show all contacts.'
+                : 'Showing all contacts. Click to filter to target audience.'}
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Nav */}

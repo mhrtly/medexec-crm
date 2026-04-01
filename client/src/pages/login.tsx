@@ -6,28 +6,19 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 export default function LoginPage() {
-  const { signIn, signUp } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setMessage('');
     setLoading(true);
 
-    if (isSignUp) {
-      const { error } = await signUp(email, password);
-      if (error) setError(error.message);
-      else setMessage('Check your email for a confirmation link.');
-    } else {
-      const { error } = await signIn(email, password);
-      if (error) setError(error.message);
-    }
+    const { error } = await signIn(email, password);
+    if (error) setError(error.message);
     setLoading(false);
   };
 
@@ -50,7 +41,7 @@ export default function LoginPage() {
         <Card>
           <CardHeader className="pb-4">
             <h2 className="text-base font-medium text-center">
-              {isSignUp ? 'Create your account' : 'Sign in to continue'}
+              Sign in to continue
             </h2>
           </CardHeader>
           <CardContent>
@@ -84,25 +75,11 @@ export default function LoginPage() {
               {error && (
                 <p className="text-sm text-destructive" data-testid="text-error">{error}</p>
               )}
-              {message && (
-                <p className="text-sm text-green-600 dark:text-green-400" data-testid="text-message">{message}</p>
-              )}
 
               <Button type="submit" className="w-full" disabled={loading} data-testid="button-submit">
-                {loading ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
+                {loading ? 'Please wait...' : 'Sign In'}
               </Button>
             </form>
-
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                data-testid="button-toggle-auth"
-              >
-                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-              </button>
-            </div>
           </CardContent>
         </Card>
       </div>
