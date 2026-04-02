@@ -1,144 +1,181 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Tag as TagIcon } from 'lucide-react';
+import { Tag, Plus, ChevronRight, Users } from 'lucide-react';
 
 interface TagWithCount {
   id: number;
   name: string;
   category: string | null;
-  contact_count: number;
+  count: number;
 }
 
 const categoryColors: Record<string, string> = {
-  affiliation: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  source: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  event: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  geography: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  relationship: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-  'data-quality': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+  'event': 'bg-blue-100 text-blue-700',
+  'event-year': 'bg-indigo-100 text-indigo-700',
+  'registration': 'bg-green-100 text-green-700',
+  'engagement': 'bg-amber-100 text-amber-700',
+  'affiliation': 'bg-purple-100 text-purple-700',
+  'source': 'bg-slate-100 text-slate-700',
+  'geography': 'bg-teal-100 text-teal-700',
+  'relationship': 'bg-rose-100 text-rose-700',
+  'data-quality': 'bg-emerald-100 text-emerald-700',
 };
 
+const categoryOptions = [
+  'event', 'event-year', 'registration', 'engagement',
+  'affiliation', 'source', 'geography', 'relationship', 'data-quality'
+];
+
 export default function TagsPage() {
+  const { toast } = useToast();
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newName, setNewName] = useState('');
-  const [newCategory, setNewCategory] = useState('affiliation');
-  const { toast } = useToast();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newTag, setNewTag] = useState({ name: '', category: '' });
 
   useEffect(() => { loadTags(); }, []);
 
   async function loadTags() {
     setLoading(true);
-    const { data } = await supabase
-      .from('tags')
-      .select('id, name, category, contact_tags(count)')
-      .order('category')
-      .order('name');
+    // Get all tags
+    const { data: allTags } = await supabase.from('tags').select('id, name, category').order('category').order('name');
 
-    const mapped = (data ?? []).map((t: any) => ({
+    // Get counts in one query
+    const { data: countData } = await supabase.from('contact_tags').select('tag_id');
+
+    // Count per tag
+    const countMap = new Map<number, number>();
+    for (const row of (countData ?? [])) {
+      countMap.set(row.tag_id, (countMap.get(row.tag_id) ?? 0) + 1);
+    }
+
+    const result: TagWithCount[] = (allTags ?? []).map(t => ({
       ...t,
-      contact_count: t.contact_tags?.[0]?.count ?? 0,
+      count: countMap.get(t.id) ?? 0,
     }));
-    setTags(mapped as TagWithCount[]);
+
+    setTags(result);
     setLoading(false);
   }
 
-  async function addTag() {
-    if (!newName.trim()) return;
+  async function handleCreate() {
+    if (!newTag.name.trim()) {
+      toast({ title: 'Name required', variant: 'destructive' });
+      return;
+    }
     const { error } = await supabase.from('tags').insert({
-      name: newName.trim().toLowerCase().replace(/\s+/g, '-'),
-      category: newCategory,
+      name: newTag.name.trim().toLowerCase().replace(/\s+/g, '-'),
+      category: newTag.category || null,
     });
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Tag created' });
-      setNewName('');
+      setCreateOpen(false);
+      setNewTag({ name: '', category: '' });
       loadTags();
     }
   }
 
-  // Group tags by category
-  const grouped = tags.reduce<Record<string, TagWithCount[]>>((acc, tag) => {
-    const cat = tag.category ?? 'other';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(tag);
-    return acc;
-  }, {});
+  // Group by category
+  const grouped = new Map<string, TagWithCount[]>();
+  for (const tag of tags) {
+    const cat = tag.category || 'uncategorized';
+    if (!grouped.has(cat)) grouped.set(cat, []);
+    grouped.get(cat)!.push(tag);
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 max-w-5xl space-y-4">
+        <Skeleton className="h-8 w-32" />
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Tags</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{tags.length} tags across {Object.keys(grouped).length} categories</p>
+    <div className="p-6 max-w-5xl space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Tags</h1>
+          <p className="text-sm text-muted-foreground">{tags.length} tags across {grouped.size} categories</p>
+        </div>
+        <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+          <Plus className="w-4 h-4" /> New Tag
+        </Button>
       </div>
 
-      {/* Add tag */}
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-semibold">Add Tag</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="tag-name" className="h-8 text-xs flex-1" data-testid="input-new-tag" />
-            <Select value={newCategory} onValueChange={setNewCategory}>
-              <SelectTrigger className="w-36 h-8 text-xs" data-testid="select-tag-category"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="affiliation">Affiliation</SelectItem>
-                <SelectItem value="source">Source</SelectItem>
-                <SelectItem value="event">Event</SelectItem>
-                <SelectItem value="geography">Geography</SelectItem>
-                <SelectItem value="relationship">Relationship</SelectItem>
-                <SelectItem value="data-quality">Data Quality</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button size="sm" className="h-8 text-xs" onClick={addTag} data-testid="button-add-tag">
-              <Plus className="w-3 h-3 mr-1" /> Add
-            </Button>
+      {Array.from(grouped.entries()).map(([category, catTags]) => (
+        <div key={category}>
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+            <Badge variant="secondary" className={`text-[10px] ${categoryColors[category] ?? 'bg-gray-100 text-gray-700'}`}>
+              {category}
+            </Badge>
+            <span className="text-muted-foreground/50">{catTags.length} tags</span>
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+            {catTags.map(tag => (
+              <Link key={tag.id} href={`/tags/${tag.id}`}>
+                <Card className="hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Tag className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-sm font-medium group-hover:text-primary transition-colors truncate">{tag.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 ml-5">
+                        <Users className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground tabular-nums">{tag.count.toLocaleString()} contacts</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary transition-colors shrink-0" />
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Tag groups */}
-      {loading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}><CardContent className="p-5"><div className="h-16 bg-muted rounded animate-pulse" /></CardContent></Card>
-          ))}
         </div>
-      ) : (
-        Object.entries(grouped).map(([category, categoryTags]) => (
-          <Card key={category}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold capitalize flex items-center gap-2">
-                <TagIcon className="w-4 h-4 text-muted-foreground" />
-                {category}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {categoryTags.map((tag) => (
-                  <Badge
-                    key={tag.id}
-                    variant="secondary"
-                    className={`text-xs px-3 py-1 ${categoryColors[category] ?? ''}`}
-                    data-testid={`tag-${tag.name}`}
-                  >
-                    {tag.name}
-                    {tag.contact_count > 0 && (
-                      <span className="ml-1.5 opacity-60 tabular-nums">{tag.contact_count}</span>
-                    )}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))
-      )}
+      ))}
+
+      {/* Create Tag Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader><DialogTitle className="text-base">Create Tag</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Name</Label>
+              <Input value={newTag.name} onChange={e => setNewTag(p => ({ ...p, name: e.target.value }))} className="h-8 text-sm" placeholder="e.g. mdxw-2027-paid" />
+              <p className="text-[10px] text-muted-foreground">Will be lowercased and hyphenated</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Category</Label>
+              <Select value={newTag.category} onValueChange={val => setNewTag(p => ({ ...p, category: val }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Choose category..." /></SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleCreate}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
