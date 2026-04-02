@@ -50,18 +50,16 @@ export default function TagsPage() {
     // Get all tags
     const { data: allTags } = await supabase.from('tags').select('id, name, category').order('category').order('name');
 
-    // Get counts in one query
-    const { data: countData } = await supabase.from('contact_tags').select('tag_id');
+    // Get counts per tag in parallel
+    const tagList = allTags ?? [];
+    const countPromises = tagList.map(t =>
+      supabase.from('contact_tags').select('*', { count: 'exact', head: true }).eq('tag_id', t.id)
+    );
+    const countResults = await Promise.all(countPromises);
 
-    // Count per tag
-    const countMap = new Map<number, number>();
-    for (const row of (countData ?? [])) {
-      countMap.set(row.tag_id, (countMap.get(row.tag_id) ?? 0) + 1);
-    }
-
-    const result: TagWithCount[] = (allTags ?? []).map(t => ({
+    const result: TagWithCount[] = tagList.map((t, i) => ({
       ...t,
-      count: countMap.get(t.id) ?? 0,
+      count: countResults[i].count ?? 0,
     }));
 
     setTags(result);

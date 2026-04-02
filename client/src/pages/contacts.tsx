@@ -140,12 +140,13 @@ export default function ContactsPage() {
         query = query.in('id', ids);
       }
 
-      // Don't show duplicates
+      // Don't show duplicates, and exclude contacts with no name
       query = query.or('is_duplicate.is.null,is_duplicate.eq.false');
+      query = query.neq('full_name', '').not('full_name', 'is', null);
 
-      // Sort
-      const sortColumn = sortField === 'org_name' ? 'organizations(name)' : sortField;
-      query = query.order(sortColumn, { ascending: sortDir === 'asc' });
+      // Sort (can't sort by related table directly, fall back to full_name)
+      const sortColumn = sortField === 'org_name' ? 'full_name' : sortField;
+      query = query.order(sortColumn, { ascending: sortDir === 'asc', nullsFirst: false });
 
       // Pagination
       const from = page * PAGE_SIZE;
