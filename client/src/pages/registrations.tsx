@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 import {
   Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown,
-  Ticket, DollarSign, Users, UserCheck, Gift, RefreshCw,
+  Ticket, DollarSign, Users, UserCheck, Gift, RefreshCw, Loader2, CloudDownload,
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -71,6 +72,7 @@ function formatCurrency(amount: number): string {
 }
 
 export default function RegistrationsPage() {
+  const { toast } = useToast();
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
@@ -89,6 +91,10 @@ export default function RegistrationsPage() {
   const [yearStats, setYearStats] = useState<YearStats[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
 
+  // Sync state
+  const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => setSearchDebounced(search), 300);
@@ -97,6 +103,55 @@ export default function RegistrationsPage() {
 
   // Reset page on filter/search change
   useEffect(() => { setPage(0); }, [searchDebounced, filterYear, filterType, filterCompType]);
+
+  // Load last synced timestamp
+  const loadLastSynced = useCallback(async () => {
+    const { data } = await supabase
+      .from('registrations')
+      .select('updated_at')
+      .eq('conference_year', 2026)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (data?.updated_at) setLastSynced(data.updated_at);
+  }, []);
+
+  // Sync from Squarespace
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast({ title: 'Not authenticated', description: 'Please log in again.', variant: 'destructive' });
+        return;
+      }
+
+      const resp = await supabase.functions.invoke('sync-squarespace', {
+        body: { year: 2026 },
+      });
+
+      if (resp.error) throw resp.error;
+      const result = resp.data;
+
+      toast({
+        title: 'Sync complete',
+        description: `${result.synced} registrations synced (${result.matched} matched, ${result.unmatched} unmatched)`,
+      });
+
+      // Refresh everything
+      await Promise.all([loadStats(), loadLastSynced()]);
+      await loadRegistrations();
+    } catch (err) {
+      console.error('Sync error:', err);
+      toast({
+        title: 'Sync failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Load year stats
   const loadStats = useCallback(async () => {
@@ -175,7 +230,7 @@ export default function RegistrationsPage() {
     setLoading(false);
   }, [page, searchDebounced, sortField, sortDir, filterYear, filterType, filterCompType]);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => { loadStats(); loadLastSynced(); }, [loadStats, loadLastSynced]);
   useEffect(() => { loadRegistrations(); }, [loadRegistrations]);
 
   // Sort handler
@@ -208,12 +263,31 @@ export default function RegistrationsPage() {
           <h1 className="text-2xl font-bold">Registrations</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Conference registrations synced from Squarespace
+            {lastSynced && (
+              <span className="ml-2 text-xs">
+                · Last synced {new Date(lastSynced).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                })}
+              </span>
+            )}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => { loadStats(); loadRegistrations(); }}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => { loadStats(); loadLastSynced(); loadRegistrations(); }}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+          {filterYear === '2026' && (
+            <Button size="sm" onClick={handleSync} disabled={syncing}>
+              {syncing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CloudDownload className="w-4 h-4 mr-2" />
+              )}
+              {syncing ? 'Syncing...' : 'Sync from Squarespace'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}
