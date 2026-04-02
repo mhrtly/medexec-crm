@@ -90,7 +90,7 @@ export function EmailHistory({ contactId, refreshKey }: EmailHistoryProps) {
       </CardHeader>
       <CardContent className="p-0">
         {emails.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground text-center">No emails sent yet</p>
+          <p className="px-5 py-6 text-sm text-muted-foreground text-center">No emails sent to this contact yet. Use the Send Email button above to start the conversation.</p>
         ) : (
           <div className="divide-y divide-border">
             {emails.map((email) => {

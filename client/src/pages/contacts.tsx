@@ -4,7 +4,7 @@ import { useTargetAudience, VP_PLUS_SENIORITIES } from '@/lib/target-audience';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, ChevronLeft, ChevronRight, ArrowUpDown, Filter, X } from 'lucide-react';
 import { Link } from 'wouter';
 
@@ -19,6 +19,13 @@ interface Contact {
   gender: string | null;
   is_verified: boolean;
   organizations: { name: string; is_medtech: boolean | null } | null;
+}
+
+interface TagOption {
+  id: number;
+  name: string;
+  category: string;
+  count: number;
 }
 
 const warmthColor: Record<string, string> = {
@@ -36,6 +43,8 @@ const statusColor: Record<string, string> = {
   vip: 'bg-primary/10 text-primary',
 };
 
+const TAG_FILTER_CATEGORIES = ['event-year', 'registration', 'event', 'engagement', 'relationship'];
+
 const PAGE_SIZE = 50;
 
 export default function ContactsPage() {
@@ -50,8 +59,32 @@ export default function ContactsPage() {
   const [filterGender, setFilterGender] = useState<string>('all');
   const [filterWarmth, setFilterWarmth] = useState<string>('all');
   const [filterSeniority, setFilterSeniority] = useState<string>('all');
+  const [filterTag, setFilterTag] = useState<string>('all');
+  const [tags, setTags] = useState<TagOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Load tags on mount
+  useEffect(() => {
+    async function loadTags() {
+      const { data } = await supabase
+        .from('tags')
+        .select('id, name, category, contact_tags(count)')
+        .in('category', TAG_FILTER_CATEGORIES)
+        .order('name');
+      if (data) {
+        setTags(
+          data.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            category: t.category,
+            count: t.contact_tags?.[0]?.count ?? 0,
+          }))
+        );
+      }
+    }
+    loadTags();
+  }, []);
 
   // Debounce search
   useEffect(() => {
@@ -61,6 +94,24 @@ export default function ContactsPage() {
 
   const loadContacts = useCallback(async () => {
     setLoading(true);
+
+    // If tag filter is active, first get matching contact IDs
+    let tagContactIds: number[] | null = null;
+    if (filterTag !== 'all') {
+      const { data: tagData } = await supabase
+        .from('contact_tags')
+        .select('contact_id')
+        .eq('tag_id', parseInt(filterTag));
+      if (tagData) {
+        tagContactIds = tagData.map((row: any) => row.contact_id);
+        if (tagContactIds.length === 0) {
+          setContacts([]);
+          setCount(0);
+          setLoading(false);
+          return;
+        }
+      }
+    }
 
     // When target audience filter is active, use !inner join to get only medtech org contacts
     const selectStr = filterActive
@@ -78,6 +129,11 @@ export default function ContactsPage() {
       query = query.eq('organizations.is_medtech', true);
     }
 
+    // Apply tag filter
+    if (tagContactIds) {
+      query = query.in('id', tagContactIds);
+    }
+
     // Apply additional manual filters
     if (debouncedSearch) {
       query = query.or(`full_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,title.ilike.%${debouncedSearch}%`);
@@ -93,7 +149,7 @@ export default function ContactsPage() {
     setContacts((data ?? []) as unknown as Contact[]);
     setCount(total ?? 0);
     setLoading(false);
-  }, [debouncedSearch, page, sortBy, sortAsc, filterGender, filterWarmth, filterSeniority, filterActive]);
+  }, [debouncedSearch, page, sortBy, sortAsc, filterGender, filterWarmth, filterSeniority, filterTag, filterActive]);
 
   useEffect(() => {
     loadContacts();
@@ -102,15 +158,21 @@ export default function ContactsPage() {
   // Reset page on filter/search change
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, filterGender, filterWarmth, filterSeniority, filterActive]);
+  }, [debouncedSearch, filterGender, filterWarmth, filterSeniority, filterTag, filterActive]);
 
   const totalPages = Math.ceil(count / PAGE_SIZE);
-  const hasActiveFilters = filterGender !== 'all' || filterWarmth !== 'all' || filterSeniority !== 'all';
+  const hasActiveFilters = filterGender !== 'all' || filterWarmth !== 'all' || filterSeniority !== 'all' || filterTag !== 'all';
 
   const toggleSort = (col: string) => {
     if (sortBy === col) setSortAsc(!sortAsc);
     else { setSortBy(col); setSortAsc(true); }
   };
+
+  const tagsByCategory = TAG_FILTER_CATEGORIES.reduce<Record<string, TagOption[]>>((acc, cat) => {
+    const catTags = tags.filter((t) => t.category === cat);
+    if (catTags.length > 0) acc[cat] = catTags;
+    return acc;
+  }, {});
 
   const SortHeader = ({ col, label, className = '' }: { col: string; label: string; className?: string }) => (
     <th
@@ -161,7 +223,7 @@ export default function ContactsPage() {
           Filters
           {hasActiveFilters && (
             <span className="ml-1.5 bg-primary-foreground/20 text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
-              {[filterGender, filterWarmth, filterSeniority].filter(f => f !== 'all').length}
+              {[filterGender, filterWarmth, filterSeniority, filterTag].filter(f => f !== 'all').length}
             </span>
           )}
         </Button>
@@ -208,12 +270,30 @@ export default function ContactsPage() {
               </SelectContent>
             </Select>
           )}
+          <Select value={filterTag} onValueChange={setFilterTag}>
+            <SelectTrigger className="w-48 h-8 text-xs" data-testid="select-tag">
+              <SelectValue placeholder="Tag" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All tags</SelectItem>
+              {Object.entries(tagsByCategory).map(([category, catTags]) => (
+                <SelectGroup key={category}>
+                  <SelectLabel className="text-[10px] uppercase tracking-wider">{category}</SelectLabel>
+                  {catTags.map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.name} ({t.count})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
           {hasActiveFilters && (
             <Button
               variant="ghost"
               size="sm"
               className="h-8 text-xs"
-              onClick={() => { setFilterGender('all'); setFilterWarmth('all'); setFilterSeniority('all'); }}
+              onClick={() => { setFilterGender('all'); setFilterWarmth('all'); setFilterSeniority('all'); setFilterTag('all'); }}
               data-testid="button-clear-filters"
             >
               <X className="w-3 h-3 mr-1" /> Clear

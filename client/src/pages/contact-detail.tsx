@@ -45,6 +45,20 @@ interface Contact {
   organizations: { id: number; name: string; website: string | null } | null;
 }
 
+interface ContactTag {
+  tag_id: number;
+  tags: { id: number; name: string; category: string };
+}
+
+const tagCategoryColor: Record<string, string> = {
+  'event-year': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  registration: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  event: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+  engagement: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  relationship: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+  affiliation: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+};
+
 interface Sighting {
   id: number;
   source_type: string;
@@ -72,6 +86,7 @@ export default function ContactDetailPage() {
   const { toast } = useToast();
 
   const [contact, setContact] = useState<Contact | null>(null);
+  const [contactTags, setContactTags] = useState<ContactTag[]>([]);
   const [sightings, setSightings] = useState<Sighting[]>([]);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,11 +115,14 @@ export default function ContactDetailPage() {
 
   async function loadContact() {
     setLoading(true);
-    const [{ data: contactData }, { data: sightingsData }, { data: interactionsData }] = await Promise.all([
+    const [{ data: contactData }, { data: tagsData }, { data: sightingsData }, { data: interactionsData }] = await Promise.all([
       supabase.from('contacts')
         .select('*, organizations(id, name, website)')
         .eq('id', contactId!)
         .single(),
+      supabase.from('contact_tags')
+        .select('tag_id, tags(id, name, category)')
+        .eq('contact_id', contactId!),
       supabase.from('sightings')
         .select('*')
         .eq('contact_id', contactId!)
@@ -126,6 +144,7 @@ export default function ContactDetailPage() {
       setCrmNotes(c.crm_notes ?? '');
       setAssignedTo(c.assigned_to ?? '');
     }
+    setContactTags((tagsData ?? []) as unknown as ContactTag[]);
     setSightings((sightingsData ?? []) as Sighting[]);
     setInteractions((interactionsData ?? []) as Interaction[]);
     setLoading(false);
@@ -226,6 +245,19 @@ export default function ContactDetailPage() {
             )}
           </div>
         </div>
+        {contactTags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {contactTags.map((ct) => (
+              <Badge
+                key={ct.tag_id}
+                variant="secondary"
+                className={`text-[10px] px-1.5 py-0 ${tagCategoryColor[ct.tags.category] ?? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}
+              >
+                {ct.tags.name}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
