@@ -10,9 +10,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { EmailComposeDialog } from '@/components/email-compose-dialog';
+import { EmailHistory } from '@/components/email-history';
 import {
   ArrowLeft, Mail, Phone, Linkedin, Building2, Save,
-  ExternalLink, Clock, Eye, MessageSquare, Plus
+  ExternalLink, Clock, Eye, MessageSquare, Plus, Send
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -81,6 +83,10 @@ export default function ContactDetailPage() {
   const [nextAction, setNextAction] = useState('');
   const [crmNotes, setCrmNotes] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
+
+  // Email compose dialog
+  const [showEmailCompose, setShowEmailCompose] = useState(false);
+  const [emailRefreshKey, setEmailRefreshKey] = useState(0);
 
   // New interaction form
   const [showNewInteraction, setShowNewInteraction] = useState(false);
@@ -204,6 +210,11 @@ export default function ContactDetailPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {contact.email && (
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowEmailCompose(true)} data-testid="button-send-email">
+                <Send className="w-3 h-3 mr-1" /> Send Email
+              </Button>
+            )}
             {contact.is_verified && (
               <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px]">Verified</Badge>
             )}
@@ -303,6 +314,9 @@ export default function ContactDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Emails */}
+          <EmailHistory contactId={contact.id} refreshKey={emailRefreshKey} />
 
           {/* Interactions */}
           <Card>
@@ -448,6 +462,21 @@ export default function ContactDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Email compose dialog */}
+      {contact.email && (
+        <EmailComposeDialog
+          contactId={contact.id}
+          contactEmail={contact.email}
+          contactName={contact.full_name}
+          open={showEmailCompose}
+          onOpenChange={setShowEmailCompose}
+          onEmailSent={() => {
+            setEmailRefreshKey((k) => k + 1);
+            loadContact();
+          }}
+        />
+      )}
     </div>
   );
 }
