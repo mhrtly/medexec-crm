@@ -1,3 +1,5 @@
+declare const __BUILD_VERSION__: string;
+
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { useTargetAudience } from '@/lib/target-audience';
@@ -185,6 +187,13 @@ export default function Layout({ children }: { children: ReactNode }) {
               </Tooltip>
             )}
           </div>
+          {!collapsed && (
+            <div className="px-3 pb-1">
+              <span className="text-[12px] text-sky-400/80 font-mono">
+                {__BUILD_VERSION__}
+              </span>
+            </div>
+          )}
         </div>
       </aside>
 
