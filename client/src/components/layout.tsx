@@ -14,6 +14,7 @@ import {
   GitMerge,
   Target,
   Eye,
+  MessageCircle,
 } from 'lucide-react';
 import { useState, useEffect, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const navItems = [
   { path: '/organizations', label: 'Organizations', icon: Building2 },
   { path: '/tags', label: 'Tags', icon: Tag },
   { path: '/merge', label: 'Merge', icon: GitMerge },
+  { path: '/chat', label: 'Chat', icon: MessageCircle },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {

@@ -16,6 +16,7 @@ import OrgDetailPage from "@/pages/org-detail";
 import TagsPage from "@/pages/tags";
 import TagDetailPage from "@/pages/tag-detail";
 import MergePage from "@/pages/merge";
+import ChatPage from "@/pages/chat";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedApp() {
@@ -48,6 +49,7 @@ function AuthenticatedApp() {
           <Route path="/tags" component={TagsPage} />
           <Route path="/tags/:id" component={TagDetailPage} />
           <Route path="/merge" component={MergePage} />
+          <Route path="/chat" component={ChatPage} />
           <Route component={NotFound} />
         </Switch>
       </Layout>
