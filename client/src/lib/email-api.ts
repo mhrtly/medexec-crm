@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
 const SUPABASE_URL = 'https://bcjahzdtuowhaysxzzgz.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjamFoemR0dW93aGF5c3h6emd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5ODg1MzQsImV4cCI6MjA5MDU2NDUzNH0.c6qeh9CpPIJhPzR-cfPL994UNOUnXjFYYsOTzM8K-3w';
 
 interface SendEmailParams {
   contact_id: number;
@@ -23,6 +24,7 @@ export async function sendEmail(params: SendEmailParams) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
       },
       body: JSON.stringify(params),
     }
