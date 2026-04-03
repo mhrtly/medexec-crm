@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown,
-  Ticket, DollarSign, Users, UserCheck, Gift, RefreshCw, Loader2, CloudDownload,
+  Ticket, Users, UserCheck, Gift, RefreshCw, Loader2, CloudDownload,
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -42,33 +42,20 @@ interface YearStats {
   total: number;
   paid: number;
   comped: number;
-  revenue: number;
 }
 
 const compTypeColors: Record<string, string> = {
   speaker: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   board: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   past_board: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400',
-  sponsor: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
   in_kind: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
   scholarship: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-};
-
-const warmthColors: Record<string, string> = {
-  hot: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-  warm: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  cool: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
-  cold: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
 };
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function formatCurrency(amount: number): string {
-  return amount === 0 ? '—' : `$${amount.toLocaleString()}`;
 }
 
 export default function RegistrationsPage() {
@@ -110,6 +97,7 @@ export default function RegistrationsPage() {
       .from('registrations')
       .select('updated_at')
       .eq('conference_year', 2026)
+      .neq('comp_type', 'sponsor')
       .order('updated_at', { ascending: false })
       .limit(1)
       .single();
@@ -153,22 +141,22 @@ export default function RegistrationsPage() {
     }
   };
 
-  // Load year stats
+  // Load year stats — exclude sponsor registrations
   const loadStats = useCallback(async () => {
     const { data } = await supabase
       .from('registrations')
-      .select('conference_year, is_paid, amount_paid');
+      .select('conference_year, is_paid, comp_type')
+      .or('comp_type.is.null,comp_type.neq.sponsor');
 
     if (!data) return;
 
     const statsMap = new Map<number, YearStats>();
     for (const row of data) {
       const y = row.conference_year;
-      if (!statsMap.has(y)) statsMap.set(y, { year: y, total: 0, paid: 0, comped: 0, revenue: 0 });
+      if (!statsMap.has(y)) statsMap.set(y, { year: y, total: 0, paid: 0, comped: 0 });
       const s = statsMap.get(y)!;
       s.total++;
       if (row.is_paid) { s.paid++; } else { s.comped++; }
-      s.revenue += Number(row.amount_paid) || 0;
     }
 
     const stats = Array.from(statsMap.values()).sort((a, b) => b.year - a.year);
@@ -176,13 +164,14 @@ export default function RegistrationsPage() {
     setAvailableYears(stats.map(s => s.year));
   }, []);
 
-  // Load registrations
+  // Load registrations — always exclude sponsor registrations
   const loadRegistrations = useCallback(async () => {
     setLoading(true);
 
     let query = supabase
       .from('registrations')
-      .select('*, contacts(id, full_name, warmth)', { count: 'exact' });
+      .select('*, contacts(id, full_name, warmth)', { count: 'exact' })
+      .neq('comp_type', 'sponsor');
 
     // Year filter
     if (filterYear !== 'all') {
@@ -262,7 +251,7 @@ export default function RegistrationsPage() {
         <div>
           <h1 className="text-2xl font-bold">Registrations</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Conference registrations synced from Squarespace
+            Conference ticket registrations synced from Squarespace
             {lastSynced && (
               <span className="ml-2 text-xs">
                 · Last synced {new Date(lastSynced).toLocaleDateString('en-US', {
@@ -292,11 +281,11 @@ export default function RegistrationsPage() {
 
       {/* Stats Cards */}
       {currentStats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Card>
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1">
-                <Users className="w-3.5 h-3.5" /> Total
+                <Users className="w-3.5 h-3.5" /> Total Registrations
               </div>
               <p className="text-2xl font-bold">{currentStats.total}</p>
             </CardContent>
@@ -318,14 +307,6 @@ export default function RegistrationsPage() {
                 <Gift className="w-3.5 h-3.5" /> Comped
               </div>
               <p className="text-2xl font-bold">{currentStats.comped}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-3 px-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1">
-                <DollarSign className="w-3.5 h-3.5" /> Revenue
-              </div>
-              <p className="text-2xl font-bold">${currentStats.revenue.toLocaleString()}</p>
             </CardContent>
           </Card>
         </div>
@@ -364,7 +345,6 @@ export default function RegistrationsPage() {
               <SelectItem value="speaker">Speaker</SelectItem>
               <SelectItem value="board">Board</SelectItem>
               <SelectItem value="past_board">Past Board</SelectItem>
-              <SelectItem value="sponsor">Sponsor</SelectItem>
               <SelectItem value="in_kind">In-Kind</SelectItem>
               <SelectItem value="scholarship">Scholarship</SelectItem>
             </SelectContent>
@@ -407,11 +387,6 @@ export default function RegistrationsPage() {
                     </button>
                   </th>
                   <th className="text-left px-4 py-3 font-medium">Type</th>
-                  <th className="text-left px-4 py-3 font-medium">
-                    <button className="flex items-center gap-1" onClick={() => toggleSort('amount_paid')}>
-                      Paid <SortIcon field="amount_paid" />
-                    </button>
-                  </th>
                   <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Promo</th>
                   <th className="text-left px-4 py-3 font-medium">
                     <button className="flex items-center gap-1" onClick={() => toggleSort('registered_at')}>
@@ -425,14 +400,14 @@ export default function RegistrationsPage() {
                 {loading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <tr key={i} className="border-b">
-                      {Array.from({ length: 9 }).map((_, j) => (
+                      {Array.from({ length: 8 }).map((_, j) => (
                         <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-20" /></td>
                       ))}
                     </tr>
                   ))
                 ) : registrations.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                       No registrations found
                     </td>
                   </tr>
@@ -468,9 +443,6 @@ export default function RegistrationsPage() {
                             {reg.comp_type ? reg.comp_type.replace('_', ' ') : 'Comp'}
                           </Badge>
                         )}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs">
-                        {formatCurrency(reg.amount_paid)}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         {reg.promo_code ? (
@@ -554,7 +526,6 @@ export default function RegistrationsPage() {
                     <th className="text-right px-3 py-2 font-medium">Total</th>
                     <th className="text-right px-3 py-2 font-medium">Paid</th>
                     <th className="text-right px-3 py-2 font-medium">Comped</th>
-                    <th className="text-right px-3 py-2 font-medium">Revenue</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -564,7 +535,6 @@ export default function RegistrationsPage() {
                       <td className="px-3 py-2 text-right">{s.total}</td>
                       <td className="px-3 py-2 text-right">{s.paid}</td>
                       <td className="px-3 py-2 text-right">{s.comped}</td>
-                      <td className="px-3 py-2 text-right font-mono">${s.revenue.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
