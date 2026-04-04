@@ -97,7 +97,7 @@ export default function RegistrationsPage() {
       .from('registrations')
       .select('updated_at')
       .eq('conference_year', 2026)
-      .neq('comp_type', 'sponsor')
+      .or('comp_type.is.null,comp_type.neq.sponsor')
       .order('updated_at', { ascending: false })
       .limit(1)
       .single();
@@ -171,7 +171,7 @@ export default function RegistrationsPage() {
     let query = supabase
       .from('registrations')
       .select('*, contacts(id, full_name, warmth)', { count: 'exact' })
-      .neq('comp_type', 'sponsor');
+      .or('comp_type.is.null,comp_type.neq.sponsor');
 
     // Year filter
     if (filterYear !== 'all') {
