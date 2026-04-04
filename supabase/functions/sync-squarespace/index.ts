@@ -93,9 +93,12 @@ function parseOrder(order: SquarespaceOrder) {
   const promoUpper = promoCode.toUpperCase();
   let compType: string | null = null;
   if (COMP_TYPE_MAP[promoUpper]) compType = COMP_TYPE_MAP[promoUpper];
-  else if (SPONSOR_CODES.has(promoUpper)) compType = "sponsor";
+  // Note: sponsor promo codes (JANDJ, PHILIPS, etc.) do NOT set comp_type.
+  // Those are regular ticket registrations affiliated with sponsor companies.
+  // comp_type='sponsor' is ONLY for actual sponsorship package payments.
 
-  // Also detect sponsorship by ticket type (catches orders without promo codes)
+  // Detect sponsorship PAYMENTS by ticket type (Diamond, Emerald, etc.)
+  // These are corporate sponsorship invoices, not conference tickets.
   const ticketLower = ticketType.toLowerCase();
   if (!compType && (
     ticketLower.includes("diamond") ||
@@ -106,8 +109,7 @@ function parseOrder(order: SquarespaceOrder) {
     ticketLower.includes("emerald") ||
     ticketLower.includes("ruby") ||
     ticketLower.includes("sapphire") ||
-    ticketLower.includes("sponsorship") ||
-    ticketLower.includes("industry partner")
+    ticketLower.includes("sponsorship")
   )) {
     compType = "sponsor";
   }

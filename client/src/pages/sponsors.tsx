@@ -118,12 +118,20 @@ export default function SponsorsPage() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [expandedSponsors, setExpandedSponsors] = useState<Set<string>>(new Set());
 
+  // All known sponsor promo code prefixes (without the 995 suffix)
+  const sponsorPromoPattern = 'JANDJ,PHILIPS,BSCI,ZS,PWC,BCG,GE,BAXTER,INTEGRA,INSULET,OLYMPUS,SOLVENTUM,SOLV,MCKINSEY,VIZIENT,DLAPIPER,GOODWIN,LANDW,HALLORAN,MEDIVANTAGE,LSI,MASSMEDIC,MLSC,SMITHNEPHEW,AVANIA,SPONSOR2021';
+  const sponsorPromoPrefixes = sponsorPromoPattern.split(',');
+
   const loadSponsors = useCallback(async () => {
     setLoading(true);
+    // Fetch registrations that are either:
+    // - Sponsorship payments (comp_type='sponsor') — Diamond, Emerald, etc.
+    // - Attendees with sponsor promo codes — ticket registrations affiliated with sponsors
+    const promoFilters = sponsorPromoPrefixes.map(p => `promo_code.ilike.${p}%`).join(',');
     const { data, error } = await supabase
       .from('registrations')
       .select('*, contacts(id, full_name, warmth)')
-      .eq('comp_type', 'sponsor')
+      .or(`comp_type.eq.sponsor,${promoFilters}`)
       .order('order_number', { ascending: false });
 
     if (error) {
