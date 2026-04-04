@@ -18,6 +18,7 @@ import TagDetailPage from "@/pages/tag-detail";
 import MergePage from "@/pages/merge";
 import ChatPage from "@/pages/chat";
 import RegistrationsPage from "@/pages/registrations";
+import SponsorsPage from "@/pages/sponsors";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedApp() {
@@ -52,6 +53,7 @@ function AuthenticatedApp() {
           <Route path="/merge" component={MergePage} />
           <Route path="/chat" component={ChatPage} />
           <Route path="/registrations" component={RegistrationsPage} />
+          <Route path="/sponsors" component={SponsorsPage} />
           <Route component={NotFound} />
         </Switch>
       </Layout>

@@ -95,6 +95,23 @@ function parseOrder(order: SquarespaceOrder) {
   if (COMP_TYPE_MAP[promoUpper]) compType = COMP_TYPE_MAP[promoUpper];
   else if (SPONSOR_CODES.has(promoUpper)) compType = "sponsor";
 
+  // Also detect sponsorship by ticket type (catches orders without promo codes)
+  const ticketLower = ticketType.toLowerCase();
+  if (!compType && (
+    ticketLower.includes("diamond") ||
+    ticketLower.includes("platinum") ||
+    ticketLower.includes("gold") ||
+    ticketLower.includes("silver") ||
+    ticketLower.includes("bronze") ||
+    ticketLower.includes("emerald") ||
+    ticketLower.includes("ruby") ||
+    ticketLower.includes("sapphire") ||
+    ticketLower.includes("sponsorship") ||
+    ticketLower.includes("industry partner")
+  )) {
+    compType = "sponsor";
+  }
+
   const grandTotal = parseFloat(order.grandTotal.value);
   const isPaid = grandTotal > 0;
 
