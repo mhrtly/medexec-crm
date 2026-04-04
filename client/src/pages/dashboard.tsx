@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useTargetAudience, VP_PLUS_SENIORITIES } from '@/lib/target-audience';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,8 +9,10 @@ import { Link } from 'wouter';
 import {
   Users, Building2, UserCheck, TrendingUp, Flame, Target, Eye,
   Calendar, CreditCard, Gift, History, ArrowRight, Repeat,
-  ChevronDown, ChevronUp, Star
+  ChevronDown, ChevronUp, Star, Ticket, BarChart3, Sparkles,
 } from 'lucide-react';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface CampaignStats {
   paidRegistered: number;
@@ -54,8 +56,10 @@ interface RecentContact {
   relationship_status: string | null;
   seniority: string | null;
   created_at: string;
-  organizations: { name: string } | null;
+  organizations: { name: string; is_medtech?: boolean } | null;
 }
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const warmthColor: Record<string, string> = {
   hot: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -73,24 +77,68 @@ function getDaysUntil(deadline: Date): number {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
+// ─── Loading animation — ticket-selling themed ───────────────────────────────
+
+const LOADING_MESSAGES = [
+  'Scanning the guest list...',
+  'Counting registrations...',
+  'Warming up leads...',
+  'Pulling conference data...',
+  'Checking VIP attendees...',
+];
+
+function TicketLoader() {
+  const [msgIdx, setMsgIdx] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const msgTimer = setInterval(() => setMsgIdx(i => (i + 1) % LOADING_MESSAGES.length), 1200);
+    const progTimer = setInterval(() => setProgress(p => Math.min(p + Math.random() * 15, 90)), 300);
+    return () => { clearInterval(msgTimer); clearInterval(progTimer); };
+  }, []);
+
+  return (
+    <div className="p-6 max-w-7xl">
+      <div className="flex flex-col items-center justify-center py-20 gap-6">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center animate-pulse">
+            <Ticket className="w-8 h-8 text-primary" />
+          </div>
+          <Sparkles className="w-4 h-4 text-amber-400 absolute -top-1 -right-1 animate-bounce" />
+        </div>
+        <div className="text-center space-y-2">
+          <p className="text-sm font-medium text-muted-foreground animate-pulse min-h-[20px]">
+            {LOADING_MESSAGES[msgIdx]}
+          </p>
+          <div className="w-48 mx-auto">
+            <Progress value={progress} className="h-1.5" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const { filterActive } = useTargetAudience();
+
+  // Progressive state — each section loads independently
   const [campaign, setCampaign] = useState<CampaignStats | null>(null);
   const [general, setGeneral] = useState<GeneralStats | null>(null);
   const [multiYearList, setMultiYearList] = useState<MultiYearContact[]>([]);
   const [seniorityBreakdown, setSeniorityBreakdown] = useState<{ seniority: string; count: number }[]>([]);
   const [recentContacts, setRecentContacts] = useState<RecentContact[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const [phase, setPhase] = useState<'loading' | 'core' | 'done'>('loading');
   const [showAllMultiYear, setShowAllMultiYear] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [filterActive]);
-
-  async function loadData() {
-    setLoading(true);
+  const loadData = useCallback(async () => {
+    setPhase('loading');
     try {
-      // ── Step 1: Get all tags we need (single query) ──
+      // ── Phase 1: Tags + all core queries in ONE round ──
+      // Fetch tags first (fast, <50ms), then everything else in parallel
       const { data: tags } = await supabase
         .from('tags')
         .select('id, name')
@@ -102,7 +150,13 @@ export default function DashboardPage() {
       const tagMap: Record<string, number> = {};
       (tags ?? []).forEach(t => { tagMap[t.name] = t.id; });
 
-      // ── Step 2: Run ALL count queries and data queries in parallel ──
+      // Fire ALL queries in parallel — campaign, general, seniority, recent, year tags
+      const seniorityPromises = VP_PLUS_SENIORITIES.map(s =>
+        supabase.from('contacts')
+          .select('*, organizations!inner(is_medtech)', { count: 'exact', head: true })
+          .eq('gender', 'Female').eq('seniority', s).eq('organizations.is_medtech', true)
+      );
+
       const [
         paidRes, compedRes, totalRegRes,
         pastAttendeesRes, multiYearRes, eventTargetsRes,
@@ -111,7 +165,8 @@ export default function DashboardPage() {
         totalContactsRes, totalOrgsRes, medtechOrgsRes,
         warmRes, hotRes, verifiedRes,
         recentRes,
-        yearTagsRes
+        yearTagsRes,
+        ...seniorityResults
       ] = await Promise.all([
         // Campaign counts
         supabase.from('contact_tags').select('*', { count: 'exact', head: true }).eq('tag_id', tagMap['mdxw-2026-paid'] ?? -1),
@@ -132,7 +187,7 @@ export default function DashboardPage() {
         supabase.from('contacts').select('*', { count: 'exact', head: true }),
         supabase.from('organizations').select('*', { count: 'exact', head: true }),
         supabase.from('organizations').select('*', { count: 'exact', head: true }).eq('is_medtech', true),
-        // Warm/hot/verified (with filter)
+        // Warm/hot/verified
         (() => {
           let q = supabase.from('contacts').select('*, organizations!inner(is_medtech)', { count: 'exact', head: true }).in('warmth', ['warm', 'hot']);
           if (filterActive) q = q.eq('gender', 'Female').in('seniority', VP_PLUS_SENIORITIES).eq('organizations.is_medtech', true);
@@ -156,9 +211,11 @@ export default function DashboardPage() {
           if (filterActive) q = q.eq('gender', 'Female').in('seniority', VP_PLUS_SENIORITIES).eq('organizations.is_medtech', true);
           return q;
         })(),
-        // Year tags for multi-year count
+        // Year tags
         supabase.from('tags').select('id, name').like('name', 'mdxw-20%')
           .not('name', 'in', '("mdxw-2026","mdxw-2026-paid","mdxw-2026-comped")'),
+        // Seniority breakdown — included in same parallel batch
+        ...seniorityPromises,
       ]);
 
       // ── Compute intersections ──
@@ -192,25 +249,21 @@ export default function DashboardPage() {
 
       setRecentContacts((recentRes.data ?? []) as unknown as RecentContact[]);
 
-      // ── Seniority breakdown - batch query ──
-      const yearTagIds = (yearTagsRes.data ?? []).filter(t => /^mdxw-20\d{2}$/.test(t.name)).map(t => t.id);
-
-      const seniorityPromises = VP_PLUS_SENIORITIES.map(s =>
-        supabase.from('contacts')
-          .select('*, organizations!inner(is_medtech)', { count: 'exact', head: true })
-          .eq('gender', 'Female').eq('seniority', s).eq('organizations.is_medtech', true)
-      );
-      const seniorityResults = await Promise.all(seniorityPromises);
+      // Seniority (already resolved from the parallel batch)
       const seniorityData = VP_PLUS_SENIORITIES.map((s, i) => ({
         seniority: s,
-        count: seniorityResults[i].count ?? 0,
+        count: seniorityResults[i]?.count ?? 0,
       })).sort((a, b) => b.count - a.count);
       setSeniorityBreakdown(seniorityData);
 
-      // ── Multi-year contacts not registered ──
+      // Show core UI immediately
+      setPhase('core');
+
+      // ── Phase 2: Multi-year detail (background, non-blocking) ──
+      const yearTagIds = (yearTagsRes.data ?? []).filter(t => /^mdxw-20\d{2}$/.test(t.name)).map(t => t.id);
+
       if (multiNotReg.length > 0) {
         const notRegIds = multiNotReg.map(r => r.contact_id);
-        // Fetch contacts in parallel batches
         const batchSize = 50;
         const batches: number[][] = [];
         for (let i = 0; i < notRegIds.length; i += batchSize) {
@@ -227,12 +280,8 @@ export default function DashboardPage() {
         for (const res of batchResults) {
           for (const c of (res.data ?? [])) {
             allContacts.push({
-              id: c.id,
-              full_name: c.full_name,
-              title: c.title,
-              seniority: c.seniority,
-              warmth: c.warmth,
-              email: c.email,
+              id: c.id, full_name: c.full_name, title: c.title,
+              seniority: c.seniority, warmth: c.warmth, email: c.email,
               org_name: (c.organizations as any)?.name ?? null,
               is_medtech: (c.organizations as any)?.is_medtech ?? null,
               years_attended: 0,
@@ -240,14 +289,13 @@ export default function DashboardPage() {
           }
         }
 
-        // Batch year count: get all contact_tags for these contacts + year tags in one query
         if (yearTagIds.length > 0 && allContacts.length > 0) {
           const { data: yearTagData } = await supabase
             .from('contact_tags')
             .select('contact_id, tag_id')
             .in('contact_id', notRegIds)
             .in('tag_id', yearTagIds);
-          
+
           const yearCountMap = new Map<number, number>();
           for (const row of (yearTagData ?? [])) {
             yearCountMap.set(row.contact_id, (yearCountMap.get(row.contact_id) ?? 0) + 1);
@@ -268,12 +316,15 @@ export default function DashboardPage() {
       } else {
         setMultiYearList([]);
       }
+
+      setPhase('done');
     } catch (err) {
       console.error('Dashboard load error:', err);
-    } finally {
-      setLoading(false);
+      setPhase('done');
     }
-  }
+  }, [filterActive]);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const daysLeft = getDaysUntil(CAMPAIGN_DEADLINE);
   const paidPct = campaign ? Math.min((campaign.paidRegistered / CAMPAIGN_GOAL) * 100, 100) : 0;
@@ -281,22 +332,14 @@ export default function DashboardPage() {
   const perDay = daysLeft > 0 ? (needed / daysLeft).toFixed(1) : '—';
   const visibleMultiYear = showAllMultiYear ? multiYearList : multiYearList.slice(0, 10);
 
-  if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40 w-full rounded-lg" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}><CardContent className="p-5"><Skeleton className="h-16 w-full" /></CardContent></Card>
-          ))}
-        </div>
-      </div>
-    );
+  // ── Loading state — ticket-themed animation ──
+  if (phase === 'loading') {
+    return <TicketLoader />;
   }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
@@ -341,9 +384,15 @@ export default function DashboardPage() {
             <Progress value={paidPct} className="h-3" />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-5 border-t border-border/50">
-            <MiniMetric icon={CreditCard} label="Paid" value={campaign?.paidRegistered ?? 0} color="text-green-600 dark:text-green-400" />
-            <MiniMetric icon={Gift} label="Comped" value={campaign?.compedRegistered ?? 0} color="text-violet-600 dark:text-violet-400" />
-            <MiniMetric icon={Users} label="Total Registered" value={campaign?.totalRegistered ?? 0} color="text-blue-600 dark:text-blue-400" subtitle="paid + comped" />
+            <Link href="/registrations">
+              <MiniMetric icon={CreditCard} label="Paid" value={campaign?.paidRegistered ?? 0} color="text-green-600 dark:text-green-400" clickable />
+            </Link>
+            <Link href="/registrations">
+              <MiniMetric icon={Gift} label="Comped" value={campaign?.compedRegistered ?? 0} color="text-violet-600 dark:text-violet-400" clickable />
+            </Link>
+            <Link href="/registrations">
+              <MiniMetric icon={Users} label="Total Registered" value={campaign?.totalRegistered ?? 0} color="text-blue-600 dark:text-blue-400" subtitle="paid + comped" clickable />
+            </Link>
             <MiniMetric icon={TrendingUp} label="Still Needed" value={needed} color={needed > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'} />
           </div>
         </CardContent>
@@ -353,10 +402,18 @@ export default function DashboardPage() {
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Outreach Pipeline</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard label="Target Audience" value={campaign?.targetAudiencePipeline ?? 0} icon={Target} color="text-primary" subtitle="Women VP+ at MedTech" />
-          <KpiCard label="Event Targets" value={campaign?.eventTargets ?? 0} icon={Eye} color="text-indigo-600 dark:text-indigo-400" subtitle={`${campaign?.eventTargetsNotRegistered ?? 0} not yet registered`} />
-          <KpiCard label="Past Attendees" value={campaign?.pastAttendees ?? 0} icon={History} color="text-sky-600 dark:text-sky-400" subtitle={`${campaign?.pastAttendeesRegistered ?? 0} registered for 2026`} />
-          <KpiCard label="Multi-Year Attendees" value={campaign?.multiYearTotal ?? 0} icon={Repeat} color="text-amber-600 dark:text-amber-400" subtitle={`${campaign?.multiYearNotRegistered ?? 0} not registered`} />
+          <Link href="/contacts">
+            <KpiCard label="Target Audience" value={campaign?.targetAudiencePipeline ?? 0} icon={Target} color="text-primary" subtitle="Women VP+ at MedTech" clickable />
+          </Link>
+          <Link href="/contacts">
+            <KpiCard label="Event Targets" value={campaign?.eventTargets ?? 0} icon={Eye} color="text-indigo-600 dark:text-indigo-400" subtitle={`${campaign?.eventTargetsNotRegistered ?? 0} not yet registered`} clickable />
+          </Link>
+          <Link href="/contacts">
+            <KpiCard label="Past Attendees" value={campaign?.pastAttendees ?? 0} icon={History} color="text-sky-600 dark:text-sky-400" subtitle={`${campaign?.pastAttendeesRegistered ?? 0} registered for 2026`} clickable />
+          </Link>
+          <Link href="/contacts">
+            <KpiCard label="Multi-Year Attendees" value={campaign?.multiYearTotal ?? 0} icon={Repeat} color="text-amber-600 dark:text-amber-400" subtitle={`${campaign?.multiYearNotRegistered ?? 0} not registered`} clickable />
+          </Link>
         </div>
       </div>
 
@@ -391,7 +448,7 @@ export default function DashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-border/30">
                   {visibleMultiYear.map((c) => (
-                    <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                    <tr key={c.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => window.location.hash = `#/contacts/${c.id}`}>
                       <td className="px-4 py-2.5">
                         <Link href={`/contacts/${c.id}`} className="font-medium text-foreground hover:text-primary transition-colors">
                           {c.full_name}
@@ -429,6 +486,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+      {phase !== 'done' && multiYearList.length === 0 && (
+        <Card><CardContent className="p-5"><Skeleton className="h-16 w-full" /></CardContent></Card>
+      )}
 
       {/* General KPIs */}
       <div>
@@ -438,17 +498,17 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {filterActive ? (
             <>
-              <KpiCard label="Target Audience" value={campaign?.targetAudiencePipeline ?? 0} icon={Target} color="text-primary" subtitle="Women VP+ at MedTech" />
-              <KpiCard label="Warm / Hot" value={general?.warmContacts ?? 0} icon={Flame} color="text-orange-600 dark:text-orange-400" subtitle={`${general?.hotContacts ?? 0} hot`} />
-              <KpiCard label="Verified" value={general?.verifiedContacts ?? 0} icon={UserCheck} color="text-green-600 dark:text-green-400" />
-              <KpiCard label="MedTech Orgs" value={general?.medtechOrgs ?? 0} icon={Building2} color="text-violet-600 dark:text-violet-400" subtitle={`of ${general?.totalOrgs ?? 0} total`} />
+              <Link href="/contacts"><KpiCard label="Target Audience" value={campaign?.targetAudiencePipeline ?? 0} icon={Target} color="text-primary" subtitle="Women VP+ at MedTech" clickable /></Link>
+              <Link href="/contacts"><KpiCard label="Warm / Hot" value={general?.warmContacts ?? 0} icon={Flame} color="text-orange-600 dark:text-orange-400" subtitle={`${general?.hotContacts ?? 0} hot`} clickable /></Link>
+              <Link href="/contacts"><KpiCard label="Verified" value={general?.verifiedContacts ?? 0} icon={UserCheck} color="text-green-600 dark:text-green-400" clickable /></Link>
+              <Link href="/organizations"><KpiCard label="MedTech Orgs" value={general?.medtechOrgs ?? 0} icon={Building2} color="text-violet-600 dark:text-violet-400" subtitle={`of ${general?.totalOrgs ?? 0} total`} clickable /></Link>
             </>
           ) : (
             <>
-              <KpiCard label="Total Contacts" value={general?.totalContacts ?? 0} icon={Users} color="text-blue-600 dark:text-blue-400" />
-              <KpiCard label="Target Audience" value={campaign?.targetAudiencePipeline ?? 0} icon={Target} color="text-primary" subtitle="Women VP+ MedTech" />
-              <KpiCard label="Organizations" value={general?.totalOrgs ?? 0} icon={Building2} color="text-violet-600 dark:text-violet-400" />
-              <KpiCard label="Warm / Hot" value={general?.warmContacts ?? 0} icon={Flame} color="text-orange-600 dark:text-orange-400" />
+              <Link href="/contacts"><KpiCard label="Total Contacts" value={general?.totalContacts ?? 0} icon={Users} color="text-blue-600 dark:text-blue-400" clickable /></Link>
+              <Link href="/contacts"><KpiCard label="Target Audience" value={campaign?.targetAudiencePipeline ?? 0} icon={Target} color="text-primary" subtitle="Women VP+ MedTech" clickable /></Link>
+              <Link href="/organizations"><KpiCard label="Organizations" value={general?.totalOrgs ?? 0} icon={Building2} color="text-violet-600 dark:text-violet-400" clickable /></Link>
+              <Link href="/contacts"><KpiCard label="Warm / Hot" value={general?.warmContacts ?? 0} icon={Flame} color="text-orange-600 dark:text-orange-400" clickable /></Link>
             </>
           )}
         </div>
@@ -458,21 +518,27 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Target Audience by Seniority</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                Target Audience by Seniority
+              </CardTitle>
+              <Link href="/contacts" className="text-xs text-primary hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {seniorityBreakdown.map((s) => {
                 const maxCount = Math.max(...seniorityBreakdown.map(x => x.count), 1);
                 return (
-                  <div key={s.seniority} className="flex items-center gap-3">
-                    <span className="text-xs font-medium w-24 text-right text-muted-foreground shrink-0">{s.seniority}</span>
-                    <div className="flex-1 h-6 bg-muted/50 rounded overflow-hidden">
-                      <div className="h-full bg-primary/20 rounded flex items-center px-2" style={{ width: `${Math.max((s.count / maxCount) * 100, 8)}%` }}>
+                  <Link key={s.seniority} href="/contacts" className="flex items-center gap-3 group cursor-pointer">
+                    <span className="text-xs font-medium w-24 text-right text-muted-foreground shrink-0 group-hover:text-primary transition-colors">{s.seniority}</span>
+                    <div className="flex-1 h-7 bg-muted/50 rounded overflow-hidden group-hover:bg-muted/70 transition-colors">
+                      <div className="h-full bg-primary/20 group-hover:bg-primary/30 rounded flex items-center px-2 transition-colors" style={{ width: `${Math.max((s.count / maxCount) * 100, 8)}%` }}>
                         <span className="text-xs font-semibold tabular-nums">{s.count}</span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -492,9 +558,15 @@ export default function DashboardPage() {
                 <Link key={contact.id} href={`/contacts/${contact.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-muted/50 transition-colors cursor-pointer">
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{contact.full_name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{contact.title ?? 'No title'} {contact.organizations ? `· ${(contact.organizations as any).name}` : ''}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {contact.title ?? 'No title'}
+                      {contact.organizations ? ` · ${(contact.organizations as any).name}` : ''}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-3">
+                    {contact.seniority && (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0">{contact.seniority}</Badge>
+                    )}
                     {contact.warmth && contact.warmth !== 'cold' && (
                       <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${warmthColor[contact.warmth] ?? ''}`}>{contact.warmth}</Badge>
                     )}
@@ -513,12 +585,13 @@ export default function DashboardPage() {
   );
 }
 
-/* ── Helper Components ── */
-function MiniMetric({ icon: Icon, label, value, color, subtitle }: {
-  icon: any; label: string; value: number; color: string; subtitle?: string;
+// ─── Helper Components ───────────────────────────────────────────────────────
+
+function MiniMetric({ icon: Icon, label, value, color, subtitle, clickable }: {
+  icon: any; label: string; value: number; color: string; subtitle?: string; clickable?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className={`flex items-center gap-3 ${clickable ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}>
       <Icon className={`w-4 h-4 ${color} shrink-0`} />
       <div>
         <p className="text-lg font-bold tabular-nums">{value.toLocaleString()}</p>
@@ -529,11 +602,11 @@ function MiniMetric({ icon: Icon, label, value, color, subtitle }: {
   );
 }
 
-function KpiCard({ label, value, icon: Icon, color, subtitle }: {
-  label: string; value: number; icon: any; color: string; subtitle?: string;
+function KpiCard({ label, value, icon: Icon, color, subtitle, clickable }: {
+  label: string; value: number; icon: any; color: string; subtitle?: string; clickable?: boolean;
 }) {
   return (
-    <Card>
+    <Card className={clickable ? 'hover:border-primary/30 hover:shadow-md transition-all cursor-pointer' : ''}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
