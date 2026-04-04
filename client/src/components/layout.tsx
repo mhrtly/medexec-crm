@@ -13,7 +13,7 @@ import {
   Sun,
   ChevronLeft,
   ChevronRight,
-  GitMerge,
+  Copy,
   Ticket,
   Handshake,
   Target,
@@ -31,7 +31,7 @@ const navItems = [
   { path: '/registrations', label: 'Registrations', icon: Ticket },
   { path: '/sponsors', label: 'Sponsors', icon: Handshake },
   { path: '/tags', label: 'Tags', icon: Tag },
-  { path: '/merge', label: 'Merge', icon: GitMerge },
+  { path: '/dedup', label: 'Dedup', icon: Copy },
   { path: '/chat', label: 'Chat', icon: MessageCircle },
 ];
 

@@ -15,7 +15,7 @@ import OrganizationsPage from "@/pages/organizations";
 import OrgDetailPage from "@/pages/org-detail";
 import TagsPage from "@/pages/tags";
 import TagDetailPage from "@/pages/tag-detail";
-import MergePage from "@/pages/merge";
+import DedupPage from "@/pages/dedup";
 import ChatPage from "@/pages/chat";
 import RegistrationsPage from "@/pages/registrations";
 import SponsorsPage from "@/pages/sponsors";
@@ -50,7 +50,7 @@ function AuthenticatedApp() {
           <Route path="/organizations/:id" component={OrgDetailPage} />
           <Route path="/tags" component={TagsPage} />
           <Route path="/tags/:id" component={TagDetailPage} />
-          <Route path="/merge" component={MergePage} />
+          <Route path="/dedup" component={DedupPage} />
           <Route path="/chat" component={ChatPage} />
           <Route path="/registrations" component={RegistrationsPage} />
           <Route path="/sponsors" component={SponsorsPage} />
