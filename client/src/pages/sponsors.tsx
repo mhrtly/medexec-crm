@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Search, Building2, Users, UserCheck, ChevronDown, ChevronUp, RefreshCw,
+  Search, Building2, Users, UserCheck, ChevronDown, ChevronUp, RefreshCw, ExternalLink,
 } from 'lucide-react';
 
 // Map promo code prefixes to canonical sponsor names
@@ -58,6 +58,7 @@ const TIER_KEYWORDS: Record<string, string> = {
 interface SponsorReg {
   id: number;
   order_number: string;
+  squarespace_id: string | null;
   email: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -319,7 +320,8 @@ export default function SponsorsPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-muted/20">
-                          <th className="text-left px-5 py-2 font-medium text-xs">Name</th>
+                          <th className="text-left px-5 py-2 font-medium text-xs">Order #</th>
+                          <th className="text-left px-4 py-2 font-medium text-xs">Name</th>
                           <th className="text-left px-4 py-2 font-medium text-xs hidden md:table-cell">Title</th>
                           <th className="text-left px-4 py-2 font-medium text-xs hidden lg:table-cell">Company</th>
                           <th className="text-left px-4 py-2 font-medium text-xs">Promo</th>
@@ -329,7 +331,23 @@ export default function SponsorsPage() {
                       <tbody>
                         {sponsor.attendees.map((reg) => (
                           <tr key={reg.id} className="border-t border-muted/30 hover:bg-muted/10">
-                            <td className="px-5 py-2.5">
+                            <td className="px-5 py-2.5 font-mono text-[11px]">
+                              {reg.squarespace_id ? (
+                                <a
+                                  href={`https://mdxw.squarespace.com/config/commerce/orders/${reg.squarespace_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                                  title="Open in Squarespace"
+                                >
+                                  {reg.order_number}
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground">{reg.order_number}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5">
                               <div className="font-medium text-xs">
                                 {reg.first_name} {reg.last_name}
                               </div>

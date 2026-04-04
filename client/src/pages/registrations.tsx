@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import {
   Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown,
-  Ticket, Users, UserCheck, Gift, RefreshCw, Loader2, CloudDownload,
+  Ticket, Users, UserCheck, Gift, RefreshCw, Loader2, CloudDownload, ExternalLink,
 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
@@ -20,6 +20,7 @@ interface Registration {
   id: number;
   contact_id: number | null;
   order_number: string;
+  squarespace_id: string | null;
   email: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -414,8 +415,21 @@ export default function RegistrationsPage() {
                 ) : (
                   registrations.map((reg) => (
                     <tr key={reg.id} className="border-b hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {reg.order_number}
+                      <td className="px-4 py-3 font-mono text-xs">
+                        {reg.squarespace_id ? (
+                          <a
+                            href={`https://mdxw.squarespace.com/config/commerce/orders/${reg.squarespace_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                            title="Open in Squarespace"
+                          >
+                            {reg.order_number}
+                            <ExternalLink className="w-3 h-3 opacity-50" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">{reg.order_number}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium">
